@@ -1,0 +1,122 @@
+---
+title: "Configure MySQL and run Django migrations"
+description: "Configure MySQL for the inspections backend, run Django migrations, and understand the full schema history managed through Django ORM and PyMySQL."
+---
+
+The backend requires a running MySQL server. Django connects to it through PyMySQL, a pure-Python MySQL client that is registered as the `MySQLdb` driver at startup. This page covers how to configure the connection, run migrations for the first time, and understand what each migration adds to the schema.
+
+## How Django connects to MySQL
+
+`settings.py` calls `pymysql.install_as_MySQLdb()` at import time. This registers PyMySQL under the `MySQLdb` name so Django's built-in MySQL backend (`django.db.backends.mysql`) can use it without any additional configuration.
+
+<Note>
+  The `pymysql.install_as_MySQLdb()` call must happen before Django initialises the database connection. In this project it is placed at the top of `settings.py`, immediately after the imports.
+</Note>
+
+## Database configuration
+
+All connection parameters are read from the `.env` file via `python-decouple`. The relevant Django `DATABASES` block looks like this:
+
+```python settings.py
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': config('MYSQL_DATABASE'),
+        'USER': config('MYSQL_USER'),
+        'PASSWORD': config('MYSQL_PASSWORD'),
+        'HOST': config('MYSQL_HOST'),
+        'PORT': config('MYSQL_PORT', default='3306'),
+        'OPTIONS': {
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'"
+        }
+    }
+}
+```
+
+The `STRICT_TRANS_TABLES` SQL mode is set on every new connection. This causes MySQL to raise an error rather than silently truncating or coercing invalid data on `INSERT` and `UPDATE` statements, which prevents subtle data integrity issues.
+
+### Environment variables
+
+Set these values in your `.env` file before running any `manage.py` commands.
+
+| Variable | Example value | Description |
+|---|---|---|
+| `MYSQL_DATABASE` | `inspecciones` | Name of the database Django will use. |
+| `MYSQL_USER` | `django_user` | MySQL user with full privileges on `MYSQL_DATABASE`. |
+| `MYSQL_PASSWORD` | `s3cr3t` | Password for the MySQL user. |
+| `MYSQL_HOST` | `192.168.1.100` | IP address or hostname of the MySQL server. |
+| `MYSQL_PORT` | `3306` | MySQL port. Defaults to `3306` if not set. |
+
+## Create the database
+
+Before running migrations, create the database in MySQL if it does not already exist:
+
+```sql
+CREATE DATABASE inspecciones CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+Grant the configured user the necessary privileges:
+
+```sql
+GRANT ALL PRIVILEGES ON inspecciones.* TO 'django_user'@'%';
+FLUSH PRIVILEGES;
+```
+
+## Run migrations
+
+<Steps>
+  <Step title="Generate migration files (first-time only)">
+    If you are starting from the source code without pre-existing migration files, generate them:
+
+    ```bash
+    python manage.py makemigrations
+    ```
+
+    The project already includes all migration files in `inspeccion/migrations/`, so you only need this step if you add new models or modify existing ones.
+  </Step>
+
+  <Step title="Apply all migrations">
+    ```bash
+    python manage.py migrate
+    ```
+
+    Django applies any unapplied migrations in order and prints a confirmation for each one.
+  </Step>
+</Steps>
+
+## Migration history
+
+The `inspeccion` app has nine migrations. Each one builds on the previous, so they must always be applied in order.
+
+| Migration | What it adds |
+|---|---|
+| `0001_initial` | Base models for the core schema: `Inspeccion`, `InspeccionTecnico`, `Equipo`, and related supporting tables. |
+| `0002_preguntatecnica` | Adds the `PreguntaTecnica` model, which stores the inspection question catalogue. |
+| `0003_owner_area_division_equipo_area_equipo_division` | Adds `Owner`, `Area`, and `Division` models. Adds `area` and `division` foreign keys to `Equipo`. |
+| `0004_alter_preguntatecnica_options_preguntatecnica_orden` | Adds the `orden` field to `PreguntaTecnica` for controlling display order. Updates model `Meta.ordering`. |
+| `0005_inspecciontecnico_comentario` | Adds a `comentario` text field to `InspeccionTecnico` for per-question technician comments. |
+| `0006_inspecciontecnico_es_critico` | Adds the `es_critico` boolean field to `InspeccionTecnico` to flag critical findings. |
+| `0007_inspeccion_owner` | Adds an `owner` foreign key to `Inspeccion`, linking each inspection to an `Owner` record. |
+| `0008_asignacioninspeccion` | Adds the `AsignacionInspeccion` model to track which technicians are assigned to which inspections. |
+| `0009_inspeccion_comentario_hallazgo_inspeccion_sap_equnr_and_more` | Adds SAP integration fields (`sap_equnr`, and related) and the `comentario_hallazgo` field to `Inspeccion`. |
+
+<Tip>
+  To see which migrations have been applied and which are pending, run:
+
+  ```bash
+  python manage.py showmigrations inspeccion
+  ```
+</Tip>
+
+## Resetting the schema
+
+If you need to rebuild the database from scratch during development, drop and recreate the database, then run `migrate` again:
+
+```bash
+python manage.py migrate inspeccion zero   # rolls back all inspeccion migrations
+python manage.py migrate                   # reapplies all migrations
+```
+
+<Warning>
+  Rolling back migrations in a production environment will destroy data. Only use `migrate inspeccion zero` in a development or staging environment.
+</Warning>

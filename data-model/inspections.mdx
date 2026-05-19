@@ -1,0 +1,98 @@
+---
+title: "Inspections, checklist results, and assignments"
+description: "Reference for the Inspeccion, InspeccionTecnico, and AsignacionInspeccion models, including SAP integration fields and status values."
+---
+
+Three models handle the inspection lifecycle: `Inspeccion` records a single inspection session with its location, timing, and SAP integration data; `InspeccionTecnico` holds each checklist line item answered during that session; and `AsignacionInspeccion` schedules which technician is responsible for which equipment in a given week.
+
+## Inspeccion
+
+`Inspeccion` is the top-level record for a single inspection session. It links to the equipment and location inspected, captures the technician's LDAP username, and stores SAP reference fields used for cross-system traceability.
+
+| Field | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| `id` | integer | PK, auto | Primary key |
+| `fecha` | date | required | Date the inspection was performed |
+| `hora_inicio` | time | required | Inspection start time |
+| `hora_fin` | time | required | Inspection end time |
+| `division` | FK → Division | required, CASCADE | Division where the inspection took place |
+| `area` | FK → Area | required, CASCADE | Area where the inspection took place |
+| `zona` | FK → Zona | required, CASCADE | Zone where the inspection took place |
+| `equipo` | FK → Equipo | required, CASCADE | Equipment that was inspected |
+| `observaciones` | text | optional, blank allowed | General observations or notes for the session |
+| `owner` | string (50) | optional, nullable | LDAP username of the technician who performed the inspection (e.g. `ac17157`) |
+
+<Note>
+  `owner` on `Inspeccion` is a plain `CharField`, not a foreign key to Django's `User` model. It stores the LDAP `sAMAccountName` string directly. This decouples inspection records from the local user table — an inspection is preserved even if the corresponding `User` record is deleted.
+</Note>
+
+### SAP integration fields
+
+These fields are populated when the inspection is linked to an equipment record in SAP. They are all optional and nullable.
+
+| Field | Type | SAP term | Description |
+| --- | --- | --- | --- |
+| `sap_equnr` | string (50) | EQUNR | SAP equipment code — the unique identifier for the equipment object in SAP |
+| `sap_equnr_desc` | string (150) | — | Human-readable name of the equipment as it appears in SAP |
+| `sap_tplnr` | string (50) | TPLNR | SAP technical location — the functional location code in the plant maintenance hierarchy |
+| `sap_puesto_trabajo` | string (50) | Puesto de trabajo | SAP work center — the organizational unit responsible for the maintenance task |
+| `comentario_hallazgo` | text | — | Finding comment submitted back to SAP after the inspection |
+
+<Tip>
+  When submitting an inspection via the API, include the SAP fields if the equipment record has a corresponding SAP entry. Leaving them blank is valid — the inspection will still be saved and appear in the dashboard, but cross-referencing with SAP reports will not be possible.
+</Tip>
+
+### Reverse relation
+
+`Inspeccion` exposes a `revisiones` reverse relation that returns all `InspeccionTecnico` line items for the session. The dashboard endpoint returns these inline as a `tecnicos` array in each inspection object.
+
+## InspeccionTecnico
+
+`InspeccionTecnico` records a single checklist answer within an `Inspeccion`. One record is created per `PreguntaTecnica` answered during the session.
+
+| Field | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| `id` | integer | PK, auto | Primary key |
+| `inspeccion` | FK → Inspeccion | required, CASCADE | The parent inspection session |
+| `descripcion` | text | required | The question text as answered (copied from `PreguntaTecnica.descripcion` at submission time) |
+| `estado` | string (10) | required, choices | Inspection result for this item — see status values below |
+| `comentario` | text | optional, nullable | Free-text comment for this line item |
+| `es_critico` | boolean | default `False` | Whether this finding is flagged as critical |
+
+### Estado choices
+
+| Value | Label | Meaning |
+| --- | --- | --- |
+| `OK` | OK | The item passed inspection |
+| `NOK` | NOK | The item failed inspection (non-conformant) |
+| `NA` | No Aplica | The item does not apply to this equipment or situation |
+
+<Warning>
+  `descripcion` on `InspeccionTecnico` is stored as a plain text copy of the question at the time of submission. It is not a foreign key to `PreguntaTecnica`. This means inspection records remain accurate even if questions are later edited or deleted in the admin.
+</Warning>
+
+## AsignacionInspeccion
+
+`AsignacionInspeccion` represents a weekly work assignment — it records which technician (`asociado`) is scheduled to inspect which equipment (`equipo`) during a given week. Unlike `Equipo` and `Inspeccion`, the `asociado`, `equipo`, and `zona` fields are plain strings, not foreign keys. This keeps the assignment table independent of the equipment table and allows assignments to reference equipment names directly.
+
+| Field | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| `id` | integer | PK, auto | Primary key |
+| `fecha` | date | required | Monday that starts the assignment week |
+| `asociado` | string (150) | required | Technician name or identifier |
+| `equipo` | string (150) | required | Equipment name |
+| `zona` | string (150) | optional, nullable | Zone name |
+| `asignado_por` | string (100) | default `Admin` | Name or role of the person who created the assignment |
+| `creado_en` | datetime | auto, set on create | Timestamp when the record was created |
+
+### Uniqueness constraint
+
+The combination of `(fecha, asociado, equipo)` is enforced as unique. A technician cannot be assigned the same equipment item more than once in the same week.
+
+<Note>
+  The assignment API replaces all assignments for a given week in a single request — it deletes existing records for the `fecha` value and bulk-inserts the new set. There is no partial update; every POST to the assignments endpoint is a full week replacement.
+</Note>
+
+### Default ordering
+
+`AsignacionInspeccion` records are returned ordered by `asociado`, then `zona`, then `equipo`.

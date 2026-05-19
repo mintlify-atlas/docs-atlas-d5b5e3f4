@@ -1,0 +1,24 @@
+---
+title: "GET /api/categorias/ — list inspection categories"
+description: "GET /api/categorias/ — Returns all equipment inspection categories as id/nombre pairs. Categories group technical checklist questions by topic."
+---
+
+Categories group technical checklist questions (PreguntaTecnica) by topic area, such as mechanical, electrical, or safety checks. Use a category's nombre to retrieve its associated questions.
+
+**Method:** `GET` **Path:** `/api/categorias/` **Auth:** Session cookie required
+
+### Response
+
+```bash
+curl -b cookies.txt http://<host>:8080/api/categorias/
+```
+
+```json
+[
+  {"id": 1, "nombre": "Mecánico"},
+  {"id": 2, "nombre": "Eléctrico"},
+  {"id": 3, "nombre": "Seguridad"}
+]
+```
+
+<Note>Use the `nombre` value (not the `id`) to fetch questions for a category via `/api/preguntas/{categoria_nombre}/`.</Note>

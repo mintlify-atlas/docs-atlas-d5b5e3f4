@@ -1,0 +1,31 @@
+---
+title: "GET /api/preguntas/{name}/ — questions by category"
+description: "GET /api/preguntas/{categoria_nombre}/ — Returns technical checklist questions for a given category, ordered by their configured sequence."
+---
+
+Retrieve the ordered list of technical checklist questions for a specific category. Use these descriptions as keys in the `tecnicos` map when submitting an inspection.
+
+**Method:** `GET` **Path:** `/api/preguntas/{categoria_nombre}/` **Auth:** Session cookie required
+
+### Path parameters
+
+<ParamField path="categoria_nombre" type="string" required>The exact category name, e.g. "Mecánico". URL-encode spaces if needed.</ParamField>
+
+### Response
+
+<ResponseField name="id" type="integer">Question ID</ResponseField>
+<ResponseField name="descripcion" type="string">Question text — use this as the key in the `tecnicos` request body</ResponseField>
+
+```bash
+curl -b cookies.txt "http://<host>:8080/api/preguntas/Mec%C3%A1nico/"
+```
+
+```json
+[
+  {"id": 1, "descripcion": "Oil level check"},
+  {"id": 2, "descripcion": "Belt tension"},
+  {"id": 3, "descripcion": "Pressure gauge reading"}
+]
+```
+
+<Tip>Questions are ordered by their `orden` field within the category. When building the inspection form, display them in the order returned.</Tip>

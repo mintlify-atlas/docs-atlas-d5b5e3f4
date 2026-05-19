@@ -1,0 +1,44 @@
+---
+title: "GET /api/equipo/{id}/ — fetch one equipment record"
+description: "GET /api/equipo/{id}/ — Returns a single equipment record with full location and category details. Returns 404 if the equipment ID does not exist."
+---
+
+Retrieve a single equipment record by its numeric ID. Returns the same fields as the list endpoint but for one specific item.
+
+**Method:** `GET` &nbsp; **Path:** `/api/equipo/{equipo_id}/` &nbsp; **Auth:** Session cookie required
+
+### Path parameters
+
+<ParamField path="equipo_id" type="integer" required>The numeric ID of the equipment to retrieve</ParamField>
+
+### Response fields
+
+<ResponseField name="id" type="integer">Unique equipment ID</ResponseField>
+<ResponseField name="nombre" type="string">Equipment name</ResponseField>
+<ResponseField name="ubicacion" type="string">Physical location description</ResponseField>
+<ResponseField name="categoria" type="string">Category name</ResponseField>
+<ResponseField name="zona" type="string">Zone name</ResponseField>
+<ResponseField name="area" type="string">Area name</ResponseField>
+<ResponseField name="division" type="string">Division name</ResponseField>
+<ResponseField name="owner" type="string">Owner name</ResponseField>
+
+### Example
+
+```bash
+curl -b cookies.txt http://<host>:8080/api/equipo/1/
+```
+
+```json
+{
+  "id": 1,
+  "nombre": "Compresor A1",
+  "ubicacion": "Planta Norte",
+  "categoria": "Compresores",
+  "zona": "Zona 1",
+  "area": "Producción",
+  "division": "División Norte",
+  "owner": "Juan Pérez"
+}
+```
+
+<Note>Returns HTTP 404 if no equipment exists with the given ID.</Note>

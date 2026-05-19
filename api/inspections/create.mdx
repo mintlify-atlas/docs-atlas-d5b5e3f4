@@ -1,0 +1,69 @@
+---
+title: "POST /api/guardar/ — submit a completed inspection"
+description: "POST /api/guardar/ — Creates a new inspection with equipment, location, timing, SAP fields, and individual technical checklist item results."
+---
+
+Submit a completed equipment inspection. The request body includes location references, timing, SAP equipment data, and a map of technical checklist results.
+
+**Method:** `POST` **Path:** `/api/guardar/` **Auth:** Session cookie required (IP restricted)
+
+### Request body
+
+<ParamField body="fecha" type="string" required>Inspection date in YYYY-MM-DD format</ParamField>
+<ParamField body="horaInicio" type="string" required>Start time, e.g. "08:30:00"</ParamField>
+<ParamField body="horaFin" type="string" required>End time, e.g. "09:00:00"</ParamField>
+<ParamField body="division" type="integer" required>Division ID from /api/divisiones/</ParamField>
+<ParamField body="area" type="integer" required>Area ID from /api/areas/</ParamField>
+<ParamField body="zona" type="integer" required>Zone ID from /api/zonas/</ParamField>
+<ParamField body="equipo" type="integer" required>Equipment ID from /api/equipos/</ParamField>
+<ParamField body="observaciones" type="string">General observations text</ParamField>
+<ParamField body="owner" type="string">LDAP username of the inspector, e.g. "ac17157"</ParamField>
+<ParamField body="sap_equnr" type="string">SAP equipment code (EQUNR)</ParamField>
+<ParamField body="sap_equnr_desc" type="string">SAP equipment description</ParamField>
+<ParamField body="sap_tplnr" type="string">SAP technical location (TPLNR)</ParamField>
+<ParamField body="sap_puesto_trabajo" type="string">SAP work center</ParamField>
+<ParamField body="comentario_hallazgo" type="string">SAP finding comment</ParamField>
+<ParamField body="tecnicos" type="object" required>Map of checklist item description to status: `{"Item description": "OK"|"NOK"|"NA"}`</ParamField>
+<ParamField body="observacionesTecnicas" type="object">Map of checklist item description to comment text</ParamField>
+<ParamField body="criticos" type="object">Map of checklist item description to boolean (true = critical finding)</ParamField>
+
+### Response
+
+```json
+{"status": "ok", "message": "Inspección guardada"}
+```
+
+On error:
+```json
+{"status": "error", "message": "<error detail>"}
+```
+
+### Example request
+
+```bash
+curl -b cookies.txt -X POST http://<host>:8080/api/guardar/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fecha": "2025-01-15",
+    "horaInicio": "08:00:00",
+    "horaFin": "08:45:00",
+    "division": 1,
+    "area": 1,
+    "zona": 2,
+    "equipo": 5,
+    "owner": "ac17157",
+    "observaciones": "Inspection completed normally.",
+    "sap_equnr": "10001234",
+    "tecnicos": {
+      "Oil level check": "OK",
+      "Belt tension": "NOK",
+      "Safety guard": "NA"
+    },
+    "observacionesTecnicas": {
+      "Belt tension": "Belt shows wear, replacement scheduled"
+    },
+    "criticos": {
+      "Belt tension": true
+    }
+  }'
+```

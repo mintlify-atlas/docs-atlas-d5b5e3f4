@@ -1,81 +1,188 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
-icon: 'rocket'
+title: "Get started with Inspecciones Técnicas API"
+description: "Install dependencies, configure environment variables, run migrations, and make your first authenticated request to the inspection API in six steps."
 ---
 
-## Get started in three steps
+The Inspecciones Técnicas backend is a Django REST API that runs on Python 3.13 and connects to a MySQL database. This guide walks you through cloning the repository, installing dependencies, configuring your environment, and making your first authenticated request against a live server.
 
-Get your documentation site running locally and make your first customization.
+<Steps>
 
-### Step 1: Set up your local environment
+  <Step title="Clone the repository">
+    Clone the backend repository and enter the project directory:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```bash
+    git clone https://github.com/AC42027/Backend-produccion.git
+    cd Backend-produccion
+    ```
+  </Step>
 
-### Step 2: Deploy your changes
+  <Step title="Create and activate a virtual environment">
+    Create an isolated Python environment so that project dependencies do not conflict with system packages:
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    <CodeGroup>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    ```bash Windows
+    python -m venv venv
+    venv\Scripts\activate
+    ```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```bash macOS / Linux
+    python -m venv venv
+    source venv/bin/activate
+    ```
 
-### Step 3: Go live
+    </CodeGroup>
+  </Step>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+  <Step title="Install dependencies">
+    Install all required packages from `requirements.txt`:
 
-## Next steps
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-Now that you have your docs running, explore these key features:
+    Key packages installed include Django 5.2, Django REST Framework, PyMySQL, ldap3, python-decouple, django-cors-headers, and Waitress.
+  </Step>
 
-<CardGroup cols={2}>
+  <Step title="Create the .env file">
+    The backend reads all sensitive configuration from a `.env` file in the project root. Create this file before running migrations or starting the server.
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+    See [Configuration](/configuration) for a full reference of every variable. A minimal working example:
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+    ```env .env
+    SECRET_KEY=your-secret-django-key-here
+    DEBUG=False
+    ALLOWED_HOSTS=localhost,127.0.0.1
+    CSRF_TRUSTED_ORIGINS=http://localhost:3010
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+    MYSQL_DATABASE=inspecciones
+    MYSQL_USER=your_db_user
+    MYSQL_PASSWORD=your_db_password
+    MYSQL_HOST=your_db_host
+    MYSQL_PORT=3306
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+    LDAP_SERVER=your_ldap_server
+    LDAP_DOMAIN=miempresa.local
 
-</CardGroup>
+    CORS_ALLOW_ALL_ORIGINS=False
+    CORS_ALLOWED_ORIGINS=http://localhost:3010
+    ```
+
+    <Warning>
+      Never commit `.env` to version control. The project's `.gitignore` already excludes it, but verify this before pushing.
+    </Warning>
+  </Step>
+
+  <Step title="Run database migrations">
+    Apply Django's migrations to create the required tables in your MySQL database:
+
+    ```bash
+    python manage.py makemigrations
+    python manage.py migrate
+    ```
+
+    <Note>
+      Run `makemigrations` only when starting from a fresh clone or after model changes. For an existing database with the schema already applied, `migrate` alone is sufficient.
+    </Note>
+  </Step>
+
+  <Step title="Start the development server">
+    For local development, use Django's built-in server:
+
+    ```bash
+    python manage.py runserver
+    ```
+
+    The API is available at `http://localhost:8000`.
+
+    For production on Windows, use Waitress instead:
+
+    ```bash
+    python run_waitress.py
+    ```
+
+    Waitress serves the application on `http://0.0.0.0:8080`.
+  </Step>
+
+</Steps>
+
+## Make your first API requests
+
+With the server running, authenticate with your LDAP credentials and then call a data endpoint. The examples below use port `8080` (Waitress/production). If you are running the Django dev server, replace `8080` with `8000`.
+
+### Step 1: Authenticate via LDAP
+
+Send your corporate username and password to `/api/login-ldap/`. A successful response sets a session cookie that you must include in subsequent requests.
+
+```bash
+curl -c cookies.txt -X POST http://localhost:8080/api/login-ldap/ \
+  -H "Content-Type: application/json" \
+  -d '{"username": "ac17157", "password": "your-password"}'
+```
+
+A successful response returns HTTP 200 with your user details:
+
+```json
+{
+  "status": "ok",
+  "message": "Login exitoso",
+  "first_name": "Juan",
+  "last_name": "Pérez"
+}
+```
+
+### Step 2: Fetch the equipment list
+
+Use the saved session cookie to call a protected endpoint:
+
+```bash
+curl -b cookies.txt http://localhost:8080/api/equipos/
+```
+
+The response returns the list of registered equipment:
+
+```json
+[
+  {
+    "id": 1,
+    "nombre": "Compresor A1",
+    "ubicacion": "Planta Norte",
+    "categoria": "Compresores",
+    "categoria_id": 3,
+    "zona": "Zona 1",
+    "zona_id": 2,
+    "area": "Producción",
+    "area_id": 1,
+    "division": "División Norte",
+    "division_id": 1,
+    "owner": "Juan Pérez"
+  }
+]
+```
+
+<Tip>
+  Session cookies expire after one hour of inactivity. The server extends the session automatically on each request while you remain active. Re-authenticate if you receive a 401 response.
+</Tip>
+
+## Available endpoints
+
+The following routes are registered in the API:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/login-ldap/` | Authenticate with LDAP credentials |
+| `GET` | `/api/logout/` | End the current session |
+| `GET` | `/api/equipos/` | List all equipment |
+| `GET` | `/api/equipo/<id>/` | Get a single equipment record |
+| `GET` | `/api/divisiones/` | List divisions |
+| `GET` | `/api/areas/` | List areas |
+| `GET` | `/api/zonas/` | List zones |
+| `GET` | `/api/categorias/` | List inspection categories |
+| `GET` | `/api/preguntas/<category>/` | Get questions for a category |
+| `POST` | `/api/guardar/` | Submit a completed inspection |
+| `GET` | `/api/asignaciones/` | List weekly technician assignments |
+| `GET` | `/api/dashboard/inspecciones/` | Retrieve all inspections for the dashboard |
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Access to most endpoints is restricted to requests from authorized IP ranges or registered hostnames. See [IP Restrictions](/authentication/ip-restrictions) for the full policy. The dashboard endpoint (`/api/dashboard/inspecciones/`) is exempt from IP restrictions.
 </Note>

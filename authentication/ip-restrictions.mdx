@@ -1,0 +1,107 @@
+---
+title: 'IP and hostname allowlist access control'
+description: 'Access to the API is restricted to authorized IP prefixes and registered hostnames. Learn which endpoints are exempt and how restrictions are enforced.'
+---
+
+The `RestringirIPMiddleware` middleware runs on every incoming request and blocks access from unauthorized network locations before the request reaches any view. This is a defense-in-depth measure on top of session authentication: even a valid session cookie is rejected if the request originates from an IP that is not on the allowlist.
+
+## How the check works
+
+The middleware applies two checks in order. If either check passes, the request proceeds normally.
+
+<Steps>
+  <Step title="Resolve client IP">
+    The middleware reads the client IP from the `HTTP_X_REAL_IP` header first. If that header is absent, it falls back to `REMOTE_ADDR`. This means that if a reverse proxy (nginx, etc.) is in front of Django, it must set `X-Real-IP` to the original client address.
+  </Step>
+  <Step title="Check IP prefix allowlist">
+    The IP is compared against each prefix in `ALLOWED_IP_PREFIXES`. A match on any prefix allows the request immediately.
+  </Step>
+  <Step title="Check dynamic hostname allowlist">
+    If no prefix matched, the middleware resolves each hostname in `ALLOWED_DYNAMIC_HOSTNAMES` via DNS and compares the result to the client IP. A match on any hostname allows the request. DNS errors for individual hostnames are silently skipped.
+  </Step>
+  <Step title="Deny">
+    If neither check produced a match, the middleware returns HTTP 403 and the request never reaches a view.
+  </Step>
+</Steps>
+
+## Allowed IP prefixes
+
+Requests from any IP address that begins with one of the following prefixes are accepted:
+
+| Prefix          | Subnet                  |
+| --------------- | ----------------------- |
+| `10.107.205.`   | Plant network segment A |
+| `10.107.204.`   | Plant network segment B |
+
+These are configured in `settings.py` as:
+
+```python
+ALLOWED_IP_PREFIXES = [
+    '10.107.205.',
+    '10.107.204.',
+]
+```
+
+## Allowed dynamic hostnames
+
+The following registered hostnames are resolved via DNS on each request. If the resolved IP matches the client IP, the request is allowed:
+
+| Hostname                           | Description        |
+| ---------------------------------- | ------------------ |
+| `CL01NL1826.la.ad.goodyear.com`    | Primary workstation |
+| `CL01NL1981.la.ad.goodyear.com`    | Shift PC            |
+
+These are configured in `settings.py` as:
+
+```python
+ALLOWED_DYNAMIC_HOSTNAMES = [
+    'CL01NL1826.la.ad.goodyear.com',
+    'CL01NL1981.la.ad.goodyear.com',
+]
+```
+
+<Note>
+  Hostname resolution happens at request time via `socket.gethostbyname()`. If a hostname cannot be resolved (for example, because the machine is powered off), that entry is skipped and the next one is checked. This means a DNS failure does not cause a false allow — it simply removes that hostname from consideration for that request.
+</Note>
+
+## Exempt paths
+
+The following path bypasses IP restriction entirely and is accessible from any network:
+
+| Path                              | Reason                                          |
+| --------------------------------- | ----------------------------------------------- |
+| `/api/dashboard/inspecciones/`    | Dashboard data is read by external reporting tools |
+
+Exempt paths are configured in `settings.py`:
+
+```python
+EXEMPT_IP_RESTRICTION_PATHS = [
+    '/api/dashboard/inspecciones/',
+]
+```
+
+## Denial response
+
+Requests that fail both checks receive HTTP `403 Forbidden` with a plain-text body:
+
+```
+Acceso denegado: Dispositivo no autorizado.
+```
+
+If the client IP cannot be determined at all (neither `HTTP_X_REAL_IP` nor `REMOTE_ADDR` is present), the response body is:
+
+```
+Acceso denegado: No se pudo identificar la IP.
+```
+
+## Middleware position
+
+`RestringirIPMiddleware` is registered last in the `MIDDLEWARE` list in `settings.py`, after Django's session and authentication middleware. This means the IP check runs after the session is loaded but before any view logic executes.
+
+<Warning>
+  If you are developing against this API from a machine outside the `10.107.204.x` or `10.107.205.x` ranges, every request (except `/api/dashboard/inspecciones/`) will return 403. Either work from an authorized network, add your IP prefix to `ALLOWED_IP_PREFIXES`, or add your hostname to `ALLOWED_DYNAMIC_HOSTNAMES` in `settings.py` and restart the server.
+</Warning>
+
+<Note>
+  If Django is deployed behind a reverse proxy, ensure the proxy sets the `X-Real-IP` header to the original client IP, not the proxy's own IP. If `X-Real-IP` contains the proxy IP, all requests will appear to originate from the same address and will be allowed or denied based on the proxy's IP alone.
+</Note>

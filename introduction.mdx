@@ -1,0 +1,55 @@
+---
+title: "Inspecciones Técnicas: equipment inspection API"
+description: "Django REST API for managing technical equipment inspections at Goodyear Chile, with LDAP auth, SAP field integration, and IP-based access control."
+---
+
+The Inspecciones Técnicas Backend is a production Django REST API that powers the equipment inspection management system at Goodyear Chile. It provides structured endpoints for recording technical inspections, managing equipment and location hierarchies, and integrating with corporate Active Directory (LDAP) and SAP systems.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get the API running and make your first request in minutes
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/auth/login">
+    Explore all endpoints with request/response schemas
+  </Card>
+  <Card title="Authentication" icon="lock" href="/authentication/ldap">
+    Authenticate via corporate LDAP and manage sessions
+  </Card>
+  <Card title="Data Model" icon="database" href="/data-model/overview">
+    Understand equipment, inspection, and location structures
+  </Card>
+</CardGroup>
+
+## What this API does
+
+The backend manages the full lifecycle of technical equipment inspections — from capturing inspection results in the field to surfacing aggregated data in dashboards. Core capabilities include:
+
+- **Equipment inspections** — Record OK/NOK/NA status for individual technical checklist items, flag critical findings, and attach SAP equipment codes
+- **Location hierarchy** — Navigate divisions, areas, zones, and physical locations that mirror the plant floor structure
+- **LDAP authentication** — Authenticate technicians using their existing corporate Active Directory credentials
+- **Weekly assignments** — Schedule which technician inspects which equipment each week
+- **Dashboard data** — Retrieve all inspection records with full relational detail for reporting
+
+## Technology stack
+
+| Component | Technology |
+|-----------|-----------|
+| Framework | Django 5.2 + Django REST Framework |
+| Database | MySQL (via PyMySQL) |
+| Authentication | LDAP3 (Active Directory) |
+| WSGI server | Waitress (Windows production) |
+| Admin UI | Jazzmin |
+| CORS | django-cors-headers |
+| Config | python-decouple |
+
+## API base URL
+
+All endpoints are served relative to the host where the backend is deployed. In production, the server runs on port `8080`:
+
+```
+http://<host>:8080
+```
+
+<Note>
+  Access to most endpoints is restricted by IP address. Only requests from authorized network prefixes or registered hostnames are accepted. See [IP Restrictions](/authentication/ip-restrictions) for details.
+</Note>

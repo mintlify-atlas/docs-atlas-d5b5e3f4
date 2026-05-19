@@ -1,0 +1,118 @@
+---
+title: 'Authenticate requests using LDAP credentials'
+description: 'Use corporate Active Directory credentials to authenticate with the API. POST to /api/login-ldap/ and receive a session cookie for subsequent requests.'
+---
+
+The API uses your corporate Active Directory account for authentication — no separate API credentials are required. When you POST your username and password to `/api/login-ldap/`, the server binds to the LDAP server using those credentials, searches for your user record, and issues a session cookie that authorizes all subsequent requests.
+
+## How it works
+
+<Steps>
+  <Step title="Send credentials">
+    POST your Active Directory username and password as JSON to `/api/login-ldap/`.
+  </Step>
+  <Step title="LDAP validation">
+    The server connects to the configured LDAP server using your credentials (`username@DOMAIN`). A successful bind confirms the password is correct. The server then searches your directory entry using `sAMAccountName` and retrieves your profile attributes.
+  </Step>
+  <Step title="User record sync">
+    Django automatically creates or updates a local `User` record with your `first_name`, `last_name`, and `email` from Active Directory. This happens on every login.
+  </Step>
+  <Step title="Session issued">
+    Django sets a `sessionid` cookie in the response. Include this cookie on all subsequent API requests.
+  </Step>
+</Steps>
+
+## Login request
+
+```bash
+curl -X POST http://<host>:8080/api/login-ldap/ \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{"username": "ac12345", "password": "your_password"}'
+```
+
+### Request body
+
+| Field      | Type   | Required | Description                          |
+| ---------- | ------ | -------- | ------------------------------------ |
+| `username` | string | Yes      | Your Active Directory `sAMAccountName` (e.g. `ac12345`) |
+| `password` | string | Yes      | Your Active Directory password        |
+
+### Success response
+
+```json
+{
+  "status": "ok",
+  "message": "Login exitoso",
+  "first_name": "Juan",
+  "last_name": "Pérez"
+}
+```
+
+The response body returns your display name as resolved from Active Directory. The `sessionid` cookie is set automatically by the server.
+
+## Using the session cookie
+
+After a successful login, send the `sessionid` cookie on every subsequent request. With curl, use `-b cookies.txt` to replay the cookie jar saved during login:
+
+```bash
+curl http://<host>:8080/api/equipos/ \
+  -b cookies.txt
+```
+
+In a browser-based client, the cookie is sent automatically for same-origin requests. For cross-origin requests, set `credentials: 'include'` in your `fetch` options.
+
+## LDAP attributes fetched
+
+During login, the server retrieves the following Active Directory attributes for your user account:
+
+| Attribute           | Description                              |
+| ------------------- | ---------------------------------------- |
+| `givenName`         | First name                               |
+| `sn`                | Last name (surname)                      |
+| `mail`              | Email address                            |
+| `userPrincipalName` | UPN / login email (used as `email` field)|
+| `title`             | Job title                                |
+| `manager`           | Manager's distinguished name             |
+| `memberOf`          | List of group DNs the user belongs to    |
+
+<Note>
+  Only `first_name`, `last_name`, and `email` are persisted to Django's `User` model. The remaining attributes (`title`, `manager`, `memberOf`) are retrieved but not stored.
+</Note>
+
+## Error responses
+
+| HTTP status | `status` | `message`                              | Cause                                         |
+| ----------- | -------- | -------------------------------------- | --------------------------------------------- |
+| `401`       | `error`  | `Credenciales inválidas`               | Wrong username or password                    |
+| `400`       | `error`  | `Formato JSON inválido`                | Request body is not valid JSON                |
+| `405`       | `error`  | `Método no permitido. Se requiere POST.` | Request used GET or another non-POST method |
+
+<CodeGroup>
+
+```json 401 invalid credentials
+{
+  "status": "error",
+  "message": "Credenciales inválidas"
+}
+```
+
+```json 400 bad JSON
+{
+  "status": "error",
+  "message": "Formato JSON inválido"
+}
+```
+
+```json 405 wrong method
+{
+  "status": "error",
+  "message": "Método no permitido. Se requiere POST."
+}
+```
+
+</CodeGroup>
+
+<Tip>
+  The endpoint accepts `OPTIONS` preflight requests and returns `{"status": "ok"}` — this is required for Next.js and other browser clients that send a CORS preflight before every POST.
+</Tip>

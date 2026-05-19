@@ -1,0 +1,59 @@
+---
+title: "GET /api/dashboard/inspecciones/ — all inspections"
+description: "Returns all inspection records with full relational detail, checklist results, and timing data. This endpoint is exempt from IP restrictions."
+---
+
+Retrieve all inspections stored in the system, each with full relational detail and the complete list of individual checklist results. This endpoint is exempt from IP access restrictions and can be called from any origin.
+
+**Method:** `GET` **Path:** `/api/dashboard/inspecciones/` **Auth:** Not required (IP restriction exempt)
+
+### Response
+
+Array of inspection objects.
+
+<ResponseField name="id" type="integer">Inspection ID</ResponseField>
+<ResponseField name="fecha" type="string">Date in YYYY-MM-DD format</ResponseField>
+<ResponseField name="horaInicio" type="string">Start time HH:MM</ResponseField>
+<ResponseField name="horaFin" type="string">End time HH:MM</ResponseField>
+<ResponseField name="division" type="string">Division name</ResponseField>
+<ResponseField name="area" type="string">Area name</ResponseField>
+<ResponseField name="zona" type="string">Zone name</ResponseField>
+<ResponseField name="equipo" type="string">Equipment name</ResponseField>
+<ResponseField name="owner" type="string">Inspector LDAP username</ResponseField>
+<ResponseField name="observaciones" type="string">General observations</ResponseField>
+<ResponseField name="tecnicos" type="array">
+  List of checklist results.
+  <Expandable title="tecnicos item fields">
+    <ResponseField name="descripcion" type="string">Checklist item description</ResponseField>
+    <ResponseField name="estado" type="string">Status: OK, NOK, or NA</ResponseField>
+    <ResponseField name="comentario" type="string">Optional comment</ResponseField>
+    <ResponseField name="es_critico" type="boolean">Whether this is a critical finding</ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```bash
+curl http://<host>:8080/api/dashboard/inspecciones/
+```
+
+```json
+[
+  {
+    "id": 42,
+    "fecha": "2025-01-15",
+    "horaInicio": "08:00",
+    "horaFin": "08:45",
+    "division": "División Norte",
+    "area": "Producción",
+    "zona": "Zona 1",
+    "equipo": "Compresor A1",
+    "owner": "ac17157",
+    "observaciones": "",
+    "tecnicos": [
+      {"descripcion": "Oil level check", "estado": "OK", "comentario": "", "es_critico": false},
+      {"descripcion": "Belt tension", "estado": "NOK", "comentario": "Replacement needed", "es_critico": true}
+    ]
+  }
+]
+```

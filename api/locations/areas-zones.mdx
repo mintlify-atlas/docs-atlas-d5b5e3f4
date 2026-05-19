@@ -1,0 +1,38 @@
+---
+title: "GET /api/areas/ and /api/zonas/ — list locations"
+description: "GET /api/areas/ and GET /api/zonas/ — Return plant areas and zones as id/nombre pairs for use when creating inspections or filtering equipment."
+---
+
+Areas and zones make up the mid and lower levels of the plant location hierarchy. Both endpoints return simple id/nombre lists — all records are returned with no filtering.
+
+## GET /api/areas/
+
+**Method:** `GET` &nbsp; **Path:** `/api/areas/` &nbsp; **Auth:** Session cookie required
+
+```bash
+curl -b cookies.txt http://<host>:8080/api/areas/
+```
+
+```json
+[
+  {"id": 1, "nombre": "Producción"},
+  {"id": 2, "nombre": "Mantenimiento"}
+]
+```
+
+## GET /api/zonas/
+
+**Method:** `GET` &nbsp; **Path:** `/api/zonas/` &nbsp; **Auth:** Session cookie required
+
+```bash
+curl -b cookies.txt http://<host>:8080/api/zonas/
+```
+
+```json
+[
+  {"id": 1, "nombre": "Zona 1"},
+  {"id": 2, "nombre": "Zona 2"}
+]
+```
+
+<Note>The API returns all areas and zones without filtering by parent. Resolve the full hierarchy using the IDs on equipment records.</Note>

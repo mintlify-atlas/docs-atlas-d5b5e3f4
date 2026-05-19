@@ -1,0 +1,124 @@
+---
+title: "Equipment, categories, owners, and locations"
+description: "Reference for equipment, location hierarchy (Division, Area, Zona), physical location, owner, and equipment category models and their fields."
+---
+
+Equipment in the Inspecciones Técnicas system is organized within a three-level plant location hierarchy (Division → Area → Zona) and enriched with an optional physical location description, a responsible owner, and a category that determines which technical questions apply during an inspection. This page documents each model, its fields, and how the pieces fit together.
+
+## Categoria
+
+`Categoria` groups both `PreguntaTecnica` checklist questions and `Equipo` records. When a technician begins an inspection, the equipment's category determines which questions are loaded.
+
+| Field | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| `id` | integer | PK, auto | Primary key |
+| `nombre` | string (100) | required | Category name |
+
+## PreguntaTecnica
+
+`PreguntaTecnica` defines a reusable checklist question. Questions are scoped to a `Categoria` and ordered within it by the `orden` field.
+
+| Field | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| `id` | integer | PK, auto | Primary key |
+| `descripcion` | string (255) | required | The question text shown to the technician |
+| `categoria` | FK → Categoria | required, CASCADE | The category this question belongs to |
+| `orden` | positive integer | default `0` | Display position within the category |
+
+<Note>
+  The combination of `(categoria, orden)` is unique. The default query ordering is `categoria__nombre`, then `orden`, then `descripcion`, so questions are consistently sequenced without any additional sorting in the API layer.
+</Note>
+
+## Division
+
+`Division` is the top level of the plant location hierarchy.
+
+| Field | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| `id` | integer | PK, auto | Primary key |
+| `nombre` | string (100) | required | Division name |
+
+## Area
+
+`Area` is the second level of the hierarchy. Every area belongs to exactly one division.
+
+| Field | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| `id` | integer | PK, auto | Primary key |
+| `nombre` | string (100) | required | Area name |
+| `division` | FK → Division | required, CASCADE | The division this area belongs to |
+
+Deleting a `Division` cascades and removes all of its `Area` records.
+
+## Zona
+
+`Zona` is the third and most granular level of the hierarchy. Every zone belongs to exactly one area.
+
+| Field | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| `id` | integer | PK, auto | Primary key |
+| `nombre` | string (100) | required | Zone name |
+| `area` | FK → Area | required, CASCADE | The area this zone belongs to |
+
+Deleting an `Area` cascades and removes all of its `Zona` records.
+
+## UbicacionFisica
+
+`UbicacionFisica` holds a freeform physical location description — for example, a specific bay, room, or installation point. It is separate from the `Division → Area → Zona` hierarchy and is assigned directly to an `Equipo`.
+
+| Field | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| `id` | integer | PK, auto | Primary key |
+| `descripcion` | string (255) | required | Human-readable location description |
+
+## Owner
+
+`Owner` represents the responsible party for one or more equipment items. This is typically a maintenance team or a named individual.
+
+| Field | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| `id` | integer | PK, auto | Primary key |
+| `nombre` | string (100) | required | Owner name |
+| `descripcion` | text | optional, nullable | Extended description or notes |
+
+`Owner` has a `equipos` reverse relation that returns all `Equipo` records assigned to it.
+
+## Equipo
+
+`Equipo` is the central equipment record. It carries its full location context directly — `division`, `area`, and `zona` are denormalized onto the record so that queries and API responses do not need to traverse the location hierarchy.
+
+| Field | Type | Constraints | Description |
+| --- | --- | --- | --- |
+| `id` | integer | PK, auto | Primary key |
+| `nombre` | string (100) | required | Equipment name |
+| `ubicacion` | FK → UbicacionFisica | optional, SET NULL | Physical location description |
+| `categoria` | FK → Categoria | optional, SET NULL | Equipment category (determines checklist) |
+| `division` | FK → Division | optional, SET NULL | Plant division |
+| `area` | FK → Area | optional, SET NULL | Plant area |
+| `zona` | FK → Zona | optional, SET NULL | Plant zone |
+| `owner` | FK → Owner | optional, SET NULL | Responsible party |
+
+All foreign keys on `Equipo` use `SET NULL` on delete. Removing a location or owner record clears the reference on the equipment but does not delete the equipment itself.
+
+<Tip>
+  The `listar_equipos` endpoint returns all related fields as resolved names alongside their IDs. For example, you receive both `"categoria": "Montacargas"` and `"categoria_id": 3` in the same response object, which removes the need for secondary lookups when building a UI.
+</Tip>
+
+## How they relate
+
+```
+Division
+└── Area (FK → Division)
+    └── Zona (FK → Area)
+
+Categoria ──────────────── PreguntaTecnica (FK → Categoria, ordered by orden)
+
+UbicacionFisica ─┐
+Categoria ───────┤
+Division ────────┤──► Equipo
+Area ────────────┤
+Zona ────────────┤
+Owner ───────────┘
+```
+
+An inspection session (`Inspeccion`) inherits this location context — it holds its own `division`, `area`, `zona`, and `equipo` foreign keys copied from the equipment record at the time the inspection is submitted.

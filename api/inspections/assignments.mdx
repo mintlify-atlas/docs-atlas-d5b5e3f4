@@ -1,0 +1,58 @@
+---
+title: "GET and POST /api/asignaciones/ — weekly assignments"
+description: "GET and POST /api/asignaciones/ — Retrieve or replace weekly inspection assignments mapping technicians to equipment for a given week start date."
+---
+
+Inspection assignments schedule which technician is responsible for inspecting which equipment during a given week. Assignments are keyed by week start date (Monday) and can be fully replaced in a single POST.
+
+### GET /api/asignaciones/
+
+**Method:** `GET` **Path:** `/api/asignaciones/` **Auth:** Session cookie required
+
+#### Query parameters
+
+<ParamField query="fecha" type="string">Filter by week start date (YYYY-MM-DD). Omit to return all assignments.</ParamField>
+
+#### Response fields
+
+<ResponseField name="id" type="integer">Assignment ID</ResponseField>
+<ResponseField name="fecha" type="string">Week start date (Monday)</ResponseField>
+<ResponseField name="asociado" type="string">Technician name or ID</ResponseField>
+<ResponseField name="equipo" type="string">Equipment name</ResponseField>
+<ResponseField name="zona" type="string">Zone name (optional)</ResponseField>
+<ResponseField name="asignado_por" type="string">Who created the assignment (default: "Admin")</ResponseField>
+<ResponseField name="creado_en" type="string">ISO 8601 creation timestamp</ResponseField>
+
+```bash
+curl -b cookies.txt "http://<host>:8080/api/asignaciones/?fecha=2025-01-13"
+```
+
+### POST /api/asignaciones/
+
+**Method:** `POST` **Path:** `/api/asignaciones/` **Auth:** Session cookie required
+
+Replaces all assignments for the given `fecha` week with the provided list.
+
+<ParamField body="fecha" type="string" required>Week start date (Monday) in YYYY-MM-DD</ParamField>
+<ParamField body="asignado_por" type="string">Name of admin creating assignments (default: "Admin")</ParamField>
+<ParamField body="asignaciones" type="array" required>List of assignment objects with `asociado`, `equipo`, `zona`</ParamField>
+
+```bash
+curl -b cookies.txt -X POST http://<host>:8080/api/asignaciones/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fecha": "2025-01-13",
+    "asignado_por": "Supervisor",
+    "asignaciones": [
+      {"asociado": "ac17157", "equipo": "Compresor A1", "zona": "Zona 1"},
+      {"asociado": "ac18342", "equipo": "Bomba B2", "zona": "Zona 2"}
+    ]
+  }'
+```
+
+Success response (201):
+```json
+{"status": "ok", "mensaje": "Se guardaron 2 asignaciones"}
+```
+
+<Warning>POSTing to a fecha replaces ALL existing assignments for that week. Previous assignments for that date are deleted before the new ones are saved.</Warning>

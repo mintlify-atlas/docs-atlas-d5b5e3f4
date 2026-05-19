@@ -1,0 +1,25 @@
+---
+title: "GET /api/divisiones/ — list plant divisions"
+description: "GET /api/divisiones/ — Returns all plant divisions as id and nombre pairs. Use these IDs when creating inspections or filtering equipment by division."
+---
+
+Divisions are the top level of the location hierarchy (Division → Area → Zona). Use the IDs returned here when submitting inspection records.
+
+**Method:** `GET` &nbsp; **Path:** `/api/divisiones/` &nbsp; **Auth:** Session cookie required
+
+### Response
+
+Array of `{id, nombre}` objects.
+
+```bash
+curl -b cookies.txt http://<host>:8080/api/divisiones/
+```
+
+```json
+[
+  {"id": 1, "nombre": "División Norte"},
+  {"id": 2, "nombre": "División Sur"}
+]
+```
+
+<Note>Each Area belongs to a Division, and each Zona belongs to an Area. Use `/api/areas/` and `/api/zonas/` to get the full hierarchy.</Note>

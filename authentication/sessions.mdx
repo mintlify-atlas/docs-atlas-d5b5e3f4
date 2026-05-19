@@ -1,0 +1,73 @@
+---
+title: 'How session cookies work and when they expire'
+description: 'Sessions last 1 hour and auto-renew on each request. Learn how session cookies work with the API and how to handle session expiry gracefully.'
+---
+
+This API uses Django's server-side session framework, not token-based authentication. After a successful login, the server creates a session record in the database and sends a `sessionid` cookie to the client. Every protected endpoint reads that cookie to identify the caller. There are no bearer tokens or API keys to manage.
+
+## Session duration
+
+Sessions expire after **1 hour of inactivity**. The setting in `settings.py` is:
+
+```python
+SESSION_COOKIE_AGE = 60 * 60  # 3600 seconds
+```
+
+Because `SESSION_SAVE_EVERY_REQUEST = True` is also set, the expiry timer resets on every API call that carries a valid session cookie. As long as your client keeps making requests, the session stays alive.
+
+## Configuration reference
+
+| Setting                       | Value   | Effect                                                                 |
+| ----------------------------- | ------- | ---------------------------------------------------------------------- |
+| `SESSION_COOKIE_AGE`          | `3600`  | Session expires 1 hour after the last request                          |
+| `SESSION_SAVE_EVERY_REQUEST`  | `True`  | Each request resets the 1-hour timer                                   |
+| `SESSION_EXPIRE_AT_BROWSER_CLOSE` | `False` | Session cookie persists after the browser window is closed         |
+
+## Detecting an expired session
+
+When a session has expired or the cookie is missing, API endpoints that require a valid session will not return data. Since most views check the session implicitly, you may receive an empty result, a redirect, or an error from the IP restriction middleware. Always verify your session cookie is present and fresh before debugging other issues.
+
+<Note>
+  The views do not enforce authentication with a decorator that returns a structured 401 JSON response. If you are building a frontend client, treat any unexpected empty or error response as a signal to re-authenticate.
+</Note>
+
+## Logging out
+
+Send a GET request to `/api/logout/` to invalidate the session server-side. The server calls Django's `logout()`, which deletes the session record from the database.
+
+```bash
+curl http://<host>:8080/api/logout/ \
+  -b cookies.txt
+```
+
+### Logout response
+
+```json
+{
+  "status": "ok",
+  "message": "Sesión cerrada"
+}
+```
+
+After logout, the `sessionid` cookie is no longer valid. Subsequent requests using the old cookie will be treated as unauthenticated.
+
+## Best practices for API clients
+
+<Steps>
+  <Step title="Persist the cookie jar between requests">
+    Store and replay the `sessionid` cookie on every request. In curl, use `-c cookies.txt` on login and `-b cookies.txt` on subsequent calls. In fetch-based clients, set `credentials: 'include'`.
+  </Step>
+  <Step title="Intercept 401 responses globally">
+    Add a response interceptor that catches HTTP 401 and redirects to your login page rather than letting the error surface to the user.
+  </Step>
+  <Step title="Call logout before discarding the session">
+    Always call `/api/logout/` when the user signs out or closes the application. This cleans up the server-side session record rather than leaving stale rows in the session table.
+  </Step>
+  <Step title="Re-authenticate silently when possible">
+    If your client has stored the user's credentials securely (e.g. in a native app keychain), you can call `/api/login-ldap/` automatically when a 401 is received and retry the original request.
+  </Step>
+</Steps>
+
+<Warning>
+  `SESSION_EXPIRE_AT_BROWSER_CLOSE = False` means the session cookie is written as a persistent cookie, not a session cookie. Users who share a browser profile or device may find themselves still authenticated after closing the tab. Ensure your logout flow is explicit and accessible.
+</Warning>

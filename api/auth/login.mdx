@@ -1,0 +1,81 @@
+---
+title: 'POST /api/login-ldap/ — authenticate with LDAP'
+description: "POST /api/login-ldap/ — Authenticate using Active Directory credentials. Returns a session cookie on success and the user's first and last name."
+---
+
+The `/api/login-ldap/` endpoint authenticates a user against your corporate Active Directory via LDAP. On success, Django creates or updates a local user record and issues a `sessionid` session cookie that you must include on all subsequent requests. This endpoint is the only one that does not require an existing session.
+
+**Method:** `POST`  
+**Path:** `/api/login-ldap/`  
+**Auth required:** No  
+**CORS preflight:** Yes — the endpoint responds to `OPTIONS` requests with `{"status": "ok"}` so browser clients can complete the preflight before sending credentials.
+
+## Request body
+
+Send a JSON object with the following fields:
+
+<ParamField body="username" type="string" required>
+  Your Active Directory `sAMAccountName` (e.g. `"ac17157"`). This is the short login name used to bind to the LDAP server, not an email address.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Your Active Directory password.
+</ParamField>
+
+## Response
+
+### 200 — Success
+
+<ResponseField name="status" type="string" required>
+  Always `"ok"` on a successful login.
+</ResponseField>
+
+<ResponseField name="message" type="string" required>
+  Always `"Login exitoso"` on success.
+</ResponseField>
+
+<ResponseField name="first_name" type="string" required>
+  The user's first name as resolved from Active Directory (`givenName` attribute).
+</ResponseField>
+
+<ResponseField name="last_name" type="string" required>
+  The user's last name as resolved from Active Directory (`sn` attribute).
+</ResponseField>
+
+In addition to the JSON body, the server sets a `Set-Cookie` header containing the `sessionid` cookie. Store this cookie and send it with every subsequent request.
+
+### Error responses
+
+| HTTP status | `status` | `message` | Cause |
+|---|---|---|---|
+| `401` | `"error"` | `"Credenciales inválidas"` | Username or password rejected by the LDAP server. |
+| `400` | `"error"` | `"Formato JSON inválido"` | Request body could not be parsed as JSON. |
+| `405` | `"error"` | `"Método no permitido. Se requiere POST."` | Request used GET or any method other than POST. |
+
+## Example
+
+Log in and save the session cookie to a file so you can reuse it in subsequent requests:
+
+```bash
+curl -X POST http://<host>:8080/api/login-ldap/ \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{"username": "ac17157", "password": "your_password"}'
+```
+
+A successful response:
+
+```json
+{
+  "status": "ok",
+  "message": "Login exitoso",
+  "first_name": "Juan",
+  "last_name": "Pérez"
+}
+```
+
+The `cookies.txt` file now contains the `sessionid` cookie. Pass `-b cookies.txt` to any subsequent `curl` command to authenticate those requests.
+
+<Note>
+  The endpoint returns `{"status": "ok"}` for `OPTIONS` (CORS preflight) requests without performing any authentication. This is required by browser clients such as Next.js that send a preflight before every cross-origin POST.
+</Note>

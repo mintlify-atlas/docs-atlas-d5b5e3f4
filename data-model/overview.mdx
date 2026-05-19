@@ -1,0 +1,99 @@
+---
+title: "Data model overview: entities and relationships"
+description: "Overview of all data entities in the Inspecciones Técnicas system, their fields, and how they relate to each other in the database."
+---
+
+The Inspecciones Técnicas data model is organized around two primary concerns: equipment and its location within the plant, and the inspections performed on that equipment. All data is stored in a relational MySQL database managed by Django's ORM. Understanding these entities and their relationships is essential for consuming the API correctly or extending the system.
+
+## Models at a glance
+
+The system defines eleven models across two logical groups:
+
+| Model | Group | Description |
+| --- | --- | --- |
+| `Categoria` | Reference | Category that groups technical questions and equipment |
+| `PreguntaTecnica` | Reference | A technical checklist question, scoped to a `Categoria` |
+| `Division` | Location | Top level of the plant location hierarchy |
+| `Area` | Location | A subdivision of a `Division` |
+| `Zona` | Location | A subdivision of an `Area` |
+| `UbicacionFisica` | Location | A freeform physical location description for an equipment item |
+| `Owner` | Equipment | The responsible party (team or person) for a piece of equipment |
+| `Equipo` | Equipment | A piece of equipment to be inspected |
+| `Inspeccion` | Inspection | A single inspection session, linked to one `Equipo` |
+| `InspeccionTecnico` | Inspection | One checklist line item within an `Inspeccion` |
+| `AsignacionInspeccion` | Scheduling | A weekly assignment of a technician to an equipment item |
+
+## Location hierarchy
+
+Plant locations follow a strict three-level hierarchy. Each level is a foreign key to the level above:
+
+```
+Division
+└── Area (FK → Division)
+    └── Zona (FK → Area)
+```
+
+An `Equipo` record carries its own `division`, `area`, and `zona` foreign keys, duplicating the hierarchy directly on the equipment record. This allows the API to filter or display equipment location without traversing the full chain at query time.
+
+<Note>
+  `UbicacionFisica` is a separate, flat model that holds a freeform physical location description (for example, a room or bay name). It is distinct from the `Division → Area → Zona` hierarchy and is stored on `Equipo` as an optional foreign key.
+</Note>
+
+## Equipment and ownership
+
+An `Equipo` belongs to:
+
+- A `Categoria` — which also governs which `PreguntaTecnica` checklist questions are presented during an inspection
+- An `Owner` — the team or person responsible for the equipment
+- A location in the `Division → Area → Zona` hierarchy
+- An optional `UbicacionFisica` for a more specific physical description
+
+## Inspection structure
+
+An `Inspeccion` records a single inspection session. It references the `Division`, `Area`, `Zona`, and `Equipo` that were inspected, and it captures the LDAP username of the technician who performed the inspection in the `owner` field (a plain `CharField`, not a relation).
+
+Each `Inspeccion` has one or more `InspeccionTecnico` records — one per checklist question answered during the session. These are stored in the `revisiones` reverse relation on `Inspeccion`.
+
+```
+Inspeccion
+├── division (FK → Division)
+├── area     (FK → Area)
+├── zona     (FK → Zona)
+├── equipo   (FK → Equipo)
+└── revisiones (reverse FK from InspeccionTecnico)
+    └── InspeccionTecnico
+        ├── descripcion
+        ├── estado (OK | NOK | NA)
+        ├── comentario
+        └── es_critico
+```
+
+## Technical questions and categories
+
+`PreguntaTecnica` records define the reusable checklist questions shown to technicians. Each question belongs to a `Categoria` and has an `orden` field that controls the display sequence within that category. The combination of `(categoria, orden)` is unique, preventing duplicate positions.
+
+<Tip>
+  Questions are ordered by `categoria__nombre`, then `orden`, then `descripcion` by default (see the `Meta.ordering` on `PreguntaTecnica`). When building a checklist UI, you can rely on this ordering from any list endpoint.
+</Tip>
+
+## Weekly assignments
+
+`AsignacionInspeccion` records schedule which technician (`asociado`) should inspect which equipment (`equipo`) during a given week. The `fecha` field holds the Monday that starts the week. The triple `(fecha, asociado, equipo)` is enforced as unique, so no technician can be assigned the same equipment twice in the same week.
+
+## Entity relationship summary
+
+| Relationship | Type | Notes |
+| --- | --- | --- |
+| `Area` → `Division` | Many-to-one | Cascade delete |
+| `Zona` → `Area` | Many-to-one | Cascade delete |
+| `PreguntaTecnica` → `Categoria` | Many-to-one | Cascade delete |
+| `Equipo` → `Division`, `Area`, `Zona` | Many-to-one | SET NULL on delete |
+| `Equipo` → `UbicacionFisica` | Many-to-one | SET NULL on delete |
+| `Equipo` → `Categoria` | Many-to-one | SET NULL on delete |
+| `Equipo` → `Owner` | Many-to-one | SET NULL on delete |
+| `Inspeccion` → `Division`, `Area`, `Zona`, `Equipo` | Many-to-one | Cascade delete |
+| `InspeccionTecnico` → `Inspeccion` | Many-to-one | Cascade delete |
+
+<Warning>
+  `Inspeccion` uses `CASCADE` deletes for its location and equipment foreign keys. Deleting a `Division`, `Area`, `Zona`, or `Equipo` will permanently delete all inspection records referencing it. `Equipo` uses `SET NULL` for its own location keys, so deleting a location removes the link on the equipment record but does not delete the equipment.
+</Warning>

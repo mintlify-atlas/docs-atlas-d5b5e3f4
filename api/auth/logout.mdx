@@ -1,0 +1,52 @@
+---
+title: 'GET /api/logout/ — end the current session'
+description: 'GET /api/logout/ — Invalidates the current session cookie. Call this endpoint to log the user out and clear their server-side session.'
+---
+
+The `/api/logout/` endpoint destroys the server-side session associated with the caller's `sessionid` cookie. After a successful call, the session is invalidated and any subsequent requests that include the same cookie will be treated as unauthenticated.
+
+**Method:** `GET`  
+**Path:** `/api/logout/`  
+**Auth required:** Yes — an active `sessionid` cookie must be present. Calling this endpoint without a valid session still returns `200` but has no effect.
+
+## Request body
+
+None. This endpoint does not accept or require a request body.
+
+## Response
+
+### 200 — Success
+
+<ResponseField name="status" type="string" required>
+  Always `"ok"`.
+</ResponseField>
+
+<ResponseField name="message" type="string" required>
+  Always `"Sesión cerrada"`.
+</ResponseField>
+
+```json
+{
+  "status": "ok",
+  "message": "Sesión cerrada"
+}
+```
+
+## Example
+
+Log out using the cookie file saved during login:
+
+```bash
+curl -X GET http://<host>:8080/api/logout/ \
+  -b cookies.txt
+```
+
+After this call the `sessionid` stored in `cookies.txt` is no longer valid. Delete or discard the cookie file to avoid accidentally reusing it:
+
+```bash
+rm cookies.txt
+```
+
+<Note>
+  This endpoint uses `@csrf_exempt`, so no CSRF token is required. Once the session is invalidated, any request that relied on that cookie — including page loads and API calls — will fail or return an unauthenticated response.
+</Note>

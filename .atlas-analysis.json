@@ -1,23 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "Inspecciones Técnicas Backend",
+  "projectType": "api-service",
+  "projectName": "Inspecciones Técnicas Backend",
+  "projectDescription": "Django REST API backend for managing technical equipment inspections at Goodyear Chile, with LDAP authentication, SAP integration, and IP-based access control.",
   "theme": "luma",
-  "colors": {
-    "primary": "#003366",
-    "light": "#0055A4",
-    "dark": "#001F3F"
-  },
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/AC42027/Backend-produccion"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/AC42027/Backend-produccion"
-    }
-  },
+  "primaryColor": "#003366",
+  "lightColor": "#0055A4",
+  "darkColor": "#001F3F",
   "navigation": {
     "tabs": [
       {
@@ -94,5 +82,32 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "LDAP corporate authentication with Active Directory",
+    "Equipment inspection management with OK/NOK/NA status tracking",
+    "SAP integration fields (EQUNR, TPLNR, work center)",
+    "IP and hostname-based access control middleware",
+    "Weekly inspection assignment scheduling",
+    "Django admin panel with Jazzmin UI",
+    "MySQL database with Django ORM",
+    "CORS support for Next.js frontend integration",
+    "Session-based authentication with 1-hour timeout",
+    "REST API built with Django REST Framework"
+  ],
+  "publicApiSurface": [
+    "POST /api/login-ldap/",
+    "GET /api/logout/",
+    "POST /api/guardar/",
+    "GET /api/divisiones/",
+    "GET /api/areas/",
+    "GET /api/zonas/",
+    "GET /api/equipos/",
+    "GET /api/equipo/<equipo_id>/",
+    "GET /api/categorias/",
+    "GET /api/preguntas/<categoria_nombre>/",
+    "GET /api/dashboard/inspecciones/",
+    "GET /api/asignaciones/",
+    "POST /api/asignaciones/"
+  ]
 }

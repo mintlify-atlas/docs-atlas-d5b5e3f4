@@ -1,0 +1,125 @@
+---
+title: "Environment variable reference for the backend"
+description: "Reference for all environment variables required by the backend, including database, LDAP, CORS, and session configuration options."
+---
+
+The backend uses [python-decouple](https://pypi.org/project/python-decouple/) to load configuration from a `.env` file at the project root. Every value marked as required below must be present or the application will raise an error on startup. Values with defaults are optional but should be reviewed before deploying to production.
+
+## Complete .env example
+
+The following file shows every supported variable with representative values. Copy it to the project root and fill in the values for your environment:
+
+```env .env
+SECRET_KEY=clave-secreta-django
+DEBUG=False
+ALLOWED_HOSTS=localhost,127.0.0.1,10.107.202.51
+CSRF_TRUSTED_ORIGINS=http://localhost:3010,http://10.107.202.51:3010
+
+# Database
+MYSQL_DATABASE=inspecciones
+MYSQL_USER=usuario
+MYSQL_PASSWORD=clave
+MYSQL_HOST=IP SERVIDOR
+MYSQL_PORT=3306
+
+# LDAP
+LDAP_SERVER=SERVIDOR DE LDAP
+LDAP_DOMAIN=miempresa.local
+
+# CORS
+CORS_ALLOW_ALL_ORIGINS=False
+CORS_ALLOWED_ORIGINS=http://localhost:3010,http://10.107.202.51:3010
+```
+
+## Environment variables
+
+### Django core
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `SECRET_KEY` | Yes | — | Django's cryptographic signing key. Use a long, random string unique to each environment. |
+| `DEBUG` | No | `False` | Set to `True` only in local development. Never enable in production. |
+| `ALLOWED_HOSTS` | Yes | — | Comma-separated list of hostnames or IP addresses the server will respond to (e.g. `localhost,127.0.0.1,10.107.202.51`). |
+| `CSRF_TRUSTED_ORIGINS` | No | `[]` | Comma-separated list of origins trusted for CSRF-protected requests (e.g. `http://localhost:3010`). Required when the frontend sends cookies cross-origin. |
+
+<Warning>
+  Always set `DEBUG=False` in production. With `DEBUG=True`, Django exposes full stack traces and configuration details to anyone who can reach the server.
+</Warning>
+
+### Database (MySQL)
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `MYSQL_DATABASE` | Yes | — | Name of the MySQL database (e.g. `inspecciones`). |
+| `MYSQL_USER` | Yes | — | MySQL username with read/write access to `MYSQL_DATABASE`. |
+| `MYSQL_PASSWORD` | Yes | — | Password for `MYSQL_USER`. |
+| `MYSQL_HOST` | Yes | — | Hostname or IP address of the MySQL server. |
+| `MYSQL_PORT` | No | `3306` | TCP port the MySQL server listens on. |
+
+<Note>
+  The backend connects to MySQL via PyMySQL, which is registered as a drop-in replacement for MySQLdb. The database connection enforces `STRICT_TRANS_TABLES` mode to prevent silent data truncation.
+</Note>
+
+### LDAP authentication
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `LDAP_SERVER` | Yes | — | Hostname or IP address of the Active Directory / LDAP server (e.g. `ldap.miempresa.local`). |
+| `LDAP_DOMAIN` | Yes | — | Domain suffix appended to usernames when binding (e.g. `miempresa.local`). Credentials are sent as `username@miempresa.local`. |
+
+### CORS
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `CORS_ALLOW_ALL_ORIGINS` | No | `False` | Set to `True` to allow requests from any origin. Do not use in production. |
+| `CORS_ALLOWED_ORIGINS` | Conditional | — | Comma-separated list of allowed origins (e.g. `http://localhost:3010,http://10.107.202.51:3010`). Required when `CORS_ALLOW_ALL_ORIGINS` is `False`. |
+
+<Warning>
+  Setting `CORS_ALLOW_ALL_ORIGINS=True` disables origin validation entirely. Always use an explicit `CORS_ALLOWED_ORIGINS` list in production and ensure it matches the frontend's exact origin including port.
+</Warning>
+
+<Note>
+  The frontend is a Next.js application. Make sure the value in `CORS_ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS` reflects the exact origin the browser uses to reach the frontend, including the port number.
+</Note>
+
+## Session configuration
+
+Session behaviour is fixed in `settings.py` and is not configurable via `.env`:
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| `SESSION_COOKIE_AGE` | `3600` seconds (1 hour) | Sessions expire after one hour of inactivity. |
+| `SESSION_SAVE_EVERY_REQUEST` | `True` | The expiry timer resets on every request, keeping the session alive as long as the user is active. |
+| `SESSION_EXPIRE_AT_BROWSER_CLOSE` | `False` | Closing the browser tab does not invalidate the session. |
+
+<Tip>
+  Because `SESSION_SAVE_EVERY_REQUEST` is enabled, a user who makes at least one request per hour will stay authenticated indefinitely. The session only expires after a full hour of inactivity.
+</Tip>
+
+## IP restrictions
+
+Access to most API endpoints is limited to requests from specific IP ranges or registered hostnames. This policy is enforced by the `RestringirIPMiddleware` middleware and is configured directly in `settings.py` — not via `.env`.
+
+**Allowed IP prefixes** — requests from addresses in these subnets are permitted:
+
+```
+10.107.205.x
+10.107.204.x
+```
+
+**Allowed hostnames** — requests resolving to these hostnames are permitted regardless of IP:
+
+```
+CL01NL1826.la.ad.goodyear.com
+CL01NL1981.la.ad.goodyear.com
+```
+
+**Exempt paths** — the following endpoints accept requests from any origin and are not subject to IP restrictions:
+
+```
+/api/dashboard/inspecciones/
+```
+
+<Warning>
+  If you are consuming the API from a new machine or network, contact the system administrator to add your IP prefix or hostname to `ALLOWED_IP_PREFIXES` or `ALLOWED_DYNAMIC_HOSTNAMES` in `settings.py`. Unauthorized requests receive an HTTP 403 response.
+</Warning>

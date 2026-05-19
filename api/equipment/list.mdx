@@ -1,0 +1,48 @@
+---
+title: "GET /api/equipos/ — list all equipment"
+description: "GET /api/equipos/ — Returns all equipment with related location and category details. Each record includes division, area, zona, ubicacion, and owner."
+---
+
+List all equipment registered in the system. Each record includes resolved names and IDs for all related location and category entities.
+
+**Method:** `GET` &nbsp; **Path:** `/api/equipos/` &nbsp; **Auth:** Session cookie required
+
+### Response fields
+
+<ResponseField name="id" type="integer">Unique equipment ID</ResponseField>
+<ResponseField name="nombre" type="string">Equipment name</ResponseField>
+<ResponseField name="ubicacion" type="string">Physical location description</ResponseField>
+<ResponseField name="categoria" type="string">Category name</ResponseField>
+<ResponseField name="categoria_id" type="integer | null">Category ID</ResponseField>
+<ResponseField name="zona" type="string">Zone name</ResponseField>
+<ResponseField name="zona_id" type="integer | null">Zone ID</ResponseField>
+<ResponseField name="area" type="string">Area name</ResponseField>
+<ResponseField name="area_id" type="integer | null">Area ID</ResponseField>
+<ResponseField name="division" type="string">Division name</ResponseField>
+<ResponseField name="division_id" type="integer | null">Division ID</ResponseField>
+<ResponseField name="owner" type="string">Owner name</ResponseField>
+
+### Example
+
+```bash
+curl -b cookies.txt http://<host>:8080/api/equipos/
+```
+
+```json
+[
+  {
+    "id": 1,
+    "nombre": "Compresor A1",
+    "ubicacion": "Planta Norte",
+    "categoria": "Compresores",
+    "categoria_id": 3,
+    "zona": "Zona 1",
+    "zona_id": 2,
+    "area": "Producción",
+    "area_id": 1,
+    "division": "División Norte",
+    "division_id": 1,
+    "owner": "Juan Pérez"
+  }
+]
+```

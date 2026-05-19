@@ -1,0 +1,98 @@
+---
+title: "Serve the Django backend with Waitress on Windows"
+description: "Deploy the Django backend on Windows using Waitress as the WSGI server. Covers server startup, static file collection, and admin panel access."
+---
+
+Waitress is a pure-Python WSGI server that runs reliably on Windows without requiring a reverse proxy or native extensions. The project ships a `run_waitress.py` script at the repository root that binds the Django application to all network interfaces on port 8080. Follow the steps below to bring the backend into production.
+
+## The Waitress entry point
+
+The `run_waitress.py` script imports the Django WSGI application and passes it directly to Waitress:
+
+```python run_waitress.py
+from waitress import serve
+from mi_formulario.wsgi import application
+
+serve(application, host='0.0.0.0', port=8080)
+```
+
+`host='0.0.0.0'` means the server accepts connections on every network interface of the host machine. `port=8080` is the single port used by the frontend and any other consumers of the API.
+
+## Start the server
+
+<Steps>
+  <Step title="Activate the virtual environment">
+    ```bash
+    venv\Scripts\activate
+    ```
+  </Step>
+
+  <Step title="Collect static files">
+    Django must copy all static assets (including Jazzmin's admin styles) into the `static/` directory before Waitress can serve the admin panel correctly.
+
+    ```bash
+    python manage.py collectstatic --noinput
+    ```
+  </Step>
+
+  <Step title="Apply database migrations">
+    Ensure the database schema is up to date before accepting traffic.
+
+    ```bash
+    python manage.py migrate
+    ```
+  </Step>
+
+  <Step title="Start the Waitress server">
+    ```bash
+    python run_waitress.py
+    ```
+
+    The server starts immediately and listens on `0.0.0.0:8080`. You should see Waitress log output in the terminal confirming it is serving requests.
+  </Step>
+</Steps>
+
+## Admin panel
+
+The Django admin panel is available at:
+
+```
+http://localhost:8080/admin
+```
+
+It uses the Jazzmin theme with Goodyear branding, configured in `settings.py` under `JAZZMIN_SETTINGS`.
+
+If no superuser exists, create one before accessing the panel:
+
+```bash
+python manage.py createsuperuser
+```
+
+Follow the prompts to set a username, email, and password.
+
+## Required production settings
+
+Before going live, confirm the following values are set correctly in your `.env` file.
+
+| Setting | Required value | Reason |
+|---|---|---|
+| `DEBUG` | `False` | Prevents Django from exposing stack traces and internal details to clients. |
+| `ALLOWED_HOSTS` | Explicit hostnames and IPs | Restricts which Host headers Django will accept, preventing host header injection. |
+| `CORS_ALLOW_ALL_ORIGINS` | `False` | Forces CORS validation against the explicit `CORS_ALLOWED_ORIGINS` list. |
+| `CORS_ALLOWED_ORIGINS` | Frontend origin(s) | Only requests from these origins receive CORS headers. |
+| `CSRF_TRUSTED_ORIGINS` | Frontend origin(s) | Required for POST/PUT/DELETE requests made from a different origin. |
+
+<Warning>
+  Running with `DEBUG=True` in production exposes detailed error pages that include settings values, local variables, and file paths. Always set `DEBUG=False` before the server receives real traffic.
+</Warning>
+
+## Alternative WSGI/ASGI servers
+
+`gunicorn` (21.2.0) and `uvicorn` (0.35.0) are both present in `requirements.txt`. They are not used in the current Windows deployment but are available as alternatives:
+
+- **gunicorn** — the standard WSGI server for Linux-based deployments. Replace `python run_waitress.py` with `gunicorn mi_formulario.wsgi:application --bind 0.0.0.0:8080`.
+- **uvicorn** — an ASGI server. Useful if the project is migrated to Django's async views or ASGI mode in the future.
+
+<Note>
+  gunicorn does not run on Windows. If you migrate the deployment to a Linux host, gunicorn is the recommended replacement for Waitress.
+</Note>
